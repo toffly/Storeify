@@ -2,7 +2,6 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import categoryRouter from "./routes/categoryRoutes.js";
-import { upload } from "./middleware/upload.js";
 
 const app = express();
 
