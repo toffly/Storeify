@@ -1,4 +1,4 @@
-import { Request } from "express";
+import { NextFunction, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { findNeonUser } from "../services/neonUser.js";
 import { prisma } from "../config/prisma.js";
@@ -86,4 +86,60 @@ export const verifyAuthToken = async (
   } catch {
     return null;
   }
+};
+
+export const requireAuth = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ success: false, message: "Unautorized: No token" });
+    return;
+  }
+
+  const token = authHeader.split(" ")[1];
+  const user = await verifyAuthToken(token);
+
+  if (!user) {
+    res
+      .status(401)
+      .json({
+        success: false,
+        message: "Unautorized: Invalid or expired token",
+      });
+    return;
+  }
+
+  req.user = user;
+  next();
+};
+
+export const optionalAuth = async (
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const user = await verifyAuthToken(token);
+    if (user) {
+      req.user = user;
+    }
+  }
+  next();
+};
+
+export const requireRole = async (
+  roles: Array<"admin" | "merchant" | "customer">,
+) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if(!req.user || !roles.includes(req.user.role)){
+        res.status(403).json({ success: false, message: "Forbidden: Access denied" });
+    return;
+    }
+    next()
+  };
 };
