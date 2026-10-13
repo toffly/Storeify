@@ -91,12 +91,14 @@ export const createCategory = async (
       data: { store_id: store.id, name: name.trim(), slug: generateSlug(name) },
     });
 
-    res.status(201).json({success: true,message: "Category created",category})
+    res
+      .status(201)
+      .json({ success: true, message: "Category created", category });
   } catch (error: any) {
-    console.error("getCatergories error:", error);
+    console.error("createCatergories error:", error);
     res.status(500).json({
       success: false,
-      message: error?.message || "Failed to fetch categories",
+      message: error?.message || "Failed to create category",
     });
   }
 };
@@ -104,4 +106,24 @@ export const createCategory = async (
 export const deleteCategory = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const store = await getStore(req.user!.id);
+    if (!store) {
+      res.status(404).json({ success: false, message: "Store not found" });
+      return;
+    }
+
+    await prisma.categories.deleteMany({
+      where: { id: Number(req.params.id), store_id: store.id },
+    });
+
+    res.json({ success: true, message: "Category deleted successfully" });
+  } catch (error: any) {
+    console.error("deleteCatergories error:", error);
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to delete category",
+    });
+  }
+};
