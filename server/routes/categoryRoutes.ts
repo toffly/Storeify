@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createCategory,
+  deleteCategory,
   getCategories,
 } from "../controller/categoryController.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
@@ -18,7 +19,7 @@ categoryRouter.delete(
   "/:id",
   requireAuth,
   requireRole(["merchant"]),
-  getCategories,
+  deleteCategory,
 );
 
 export default categoryRouter
