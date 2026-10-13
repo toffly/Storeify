@@ -2,12 +2,14 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import categoryRouter from "./routes/categoryRoutes.js";
+import { upload } from "./middleware/upload.js";
 
 const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 const port = process.env.PORT || 3000;
 
