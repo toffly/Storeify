@@ -68,8 +68,7 @@ export const verifyAuthToken = async (
     let role: "admin" | "merchant" | "customer" = "customer";
     if (
       u?.role === "admin" ||
-      payload.role === "admin" ||
-      effectiveEmail.includes("admin@")
+      payload.role === "admin"
     ) {
       role = "admin";
     } else if (store || u?.role === "merchant" || payload.role === "merchant") {
@@ -132,7 +131,7 @@ export const optionalAuth = async (
   next();
 };
 
-export const requireRole = async (
+export const requireRole = (
   roles: Array<"admin" | "merchant" | "customer">,
 ) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
