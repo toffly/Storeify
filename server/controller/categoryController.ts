@@ -2,6 +2,19 @@ import { Request, Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../config/prisma.js";
 
+const getStore = async (merchantid: string) => {
+  return await prisma.stores.findFirst({ where: { merchant_id: merchantid } });
+};
+
+const generateSlug = (text: string) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "");
+};
+
 export const getCategories = async (
   req: Request,
   res: Response,
@@ -45,19 +58,48 @@ export const getCategories = async (
     res.json({ success: true, categories });
   } catch (error: any) {
     console.error("getCatergories error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: error?.message || "Failed to fetch categories",
-      });
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to fetch categories",
+    });
   }
 };
 
 export const createCategory = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const store = await getStore(req.user!.id);
+    if (!store) {
+      res.status(404).json({
+        success: false,
+        message: "Store not found",
+      });
+      return;
+    }
+    const { name } = req.body;
+    if (!name.trim()) {
+      res.status(400).json({
+        success: false,
+        message: "Category name is required",
+      });
+      return;
+    }
+
+    const category = await prisma.categories.create({
+      data: { store_id: store.id, name: name.trim(), slug: generateSlug(name) },
+    });
+
+    res.status(201).json({success: true,message: "Category created",category})
+  } catch (error: any) {
+    console.error("getCatergories error:", error);
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to fetch categories",
+    });
+  }
+};
 
 export const deleteCategory = async (
   req: AuthenticatedRequest,
