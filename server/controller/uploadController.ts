@@ -141,9 +141,9 @@ export const generateOnModelImage = async (
     throw err;
   }
 
-  const asset = data?.data?.assets?.[0] || data?.data?.result?.assets?.[9];
+  const asset = data?.data?.assets?.[0] || data?.data?.result?.assets?.[0];
   const rawUrl =
-    asset?.storage?.secure_url || asset?.secure_url || data?.secure.url;
+    asset?.storage?.secure_url || asset?.secure_url || data?.secure_url;
   if (!rawUrl) {
     throw new Error("No image URL returned from Cloudinary generation");
   }
