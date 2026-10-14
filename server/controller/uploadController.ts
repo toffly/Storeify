@@ -61,6 +61,7 @@ export const uploadSingle = async (
 
     res.json({ success: true, url });
   } catch (error: any) {
+    console.log(error?.message)
     res.status(500).json({ success: false, message: "Image upload failed" });
   }
 };
@@ -69,7 +70,35 @@ export const uploadSingle = async (
 export const uploadMultiple = async (
   req: Request,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const files = (req.files as Express.Multer.File[]) || [];
+
+    if (!files.length) {
+      res
+        .status(400)
+        .json({ success: false, message: "No image file provided" });
+      return;
+    }
+
+    const urls = await Promise.all(
+      files.map((file) => {
+        uploadToCloudinary(file.buffer, "storeify", {
+          mimetype: file.mimetype,
+          filename: file.originalname,
+        }).catch(
+          () =>
+            `data: ${file!.mimetype};base64,${file!.buffer.toString("base64")}`,
+        );
+      }),
+    );
+
+    res.json({ success: true, urls });
+  } catch (error: any) {
+    console.log(error?.message)
+    res.status(500).json({ success: false, message: "Image upload failed" });
+  }
+};
 
 // AI Transformation (Generative Recolor & background Removal)
 export const aiTransform = async (
