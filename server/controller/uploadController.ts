@@ -192,15 +192,15 @@ export const uploadMultiple = async (
     }
 
     const urls = await Promise.all(
-      files.map((file) => {
+      files.map((file) =>
         uploadToCloudinary(file.buffer, "storeify", {
           mimetype: file.mimetype,
           filename: file.originalname,
         }).catch(
           () =>
             `data: ${file!.mimetype};base64,${file!.buffer.toString("base64")}`,
-        );
-      }),
+        ),
+      ),
     );
 
     res.json({ success: true, urls });
