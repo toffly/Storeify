@@ -31,13 +31,21 @@ const ensureCloudinaryUrl = async (
   folder = "storeify/tryon",
 ): Promise<string> => {
   const cloudName = cloudinary.config().cloud_name;
-  if (cloudName && url.includes(`res.cloudinary.com/${cloudName}`)) {
+  const parsedUrl = new URL(url);
+  if (
+    cloudName &&
+    parsedUrl.protocol === "https:" &&
+    parsedUrl.hostname === "res.cloudinary.com" &&
+    parsedUrl.pathname.startsWith(`/${cloudName}/`)
+  ) {
     return url;
   }
-  const res = await cloudinary.uploader
-    .upload(url, { folder, resource_type: "image" })
-    .catch(() => null);
-  return res?.secure_url || url;
+  const res = await cloudinary.uploader.upload(url, {
+    folder,
+    resource_type: "image",
+  });
+  if (!res?.secure_url) throw new Error("Cloudinary upload failed");
+  return res.secure_url;
 };
 
 export const uploadToCloudinary = async (
