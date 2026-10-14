@@ -193,10 +193,7 @@ export const uploadMultiple = async (
         uploadToCloudinary(file.buffer, "storeify", {
           mimetype: file.mimetype,
           filename: file.originalname,
-        }).catch(
-          () =>
-            `data: ${file!.mimetype};base64,${file!.buffer.toString("base64")}`,
-        ),
+        })
       ),
     );
 
