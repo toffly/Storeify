@@ -112,9 +112,11 @@ export const generateOnModelImage = async (
     {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Basic ${Buffer.from(`${api_key}:${api_secret}`).toString("base64")}`,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(120_000),
     },
   );
 
