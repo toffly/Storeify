@@ -26,6 +26,20 @@ export const applyCloudinaryTransform = (
   return url.replace("/image/upload/", `/image/upload/${transform}/`);
 };
 
+const ensureCloudinaryUrl = async (
+  url: string,
+  folder = "storeify/tryon",
+): Promise<string> => {
+  const cloudName = cloudinary.config().cloud_name;
+  if (cloudName && url.includes(`res.cloudinary.com/${cloudName}`)) {
+    return url;
+  }
+  const res = await cloudinary.uploader
+    .upload(url, { folder, resource_type: "image" })
+    .catch(() => null);
+  return res?.secure_url || url;
+};
+
 export const uploadToCloudinary = async (
   fileBuffer: Buffer,
   folder: string = "storeify",
@@ -53,6 +67,83 @@ export const uploadToCloudinary = async (
     );
     uploadStream.end(fileBuffer);
   });
+};
+
+export interface GenerateOnModelParams {
+  prompt: string;
+  productImageUrl: string;
+  modelImageUrl: string;
+  targetPublicId?: string;
+  preference?: string;
+}
+
+export interface GenerateOnModelResult {
+  secureUrl: string;
+  publicId: string;
+  model?: string;
+  limits?: any;
+}
+
+export const generateOnModelImage = async (
+  params: GenerateOnModelParams,
+): Promise<GenerateOnModelResult> => {
+  const { cloud_name, api_key, api_secret } = cloudinary.config();
+  if (!cloud_name || !api_key || !api_secret) {
+    throw new Error("Cloudinary instance credentials are not configured");
+  }
+
+  const targetPublicId =
+    params.targetPublicId?.trim() || `tryOn/model_${Date.now()}`;
+  const payload = {
+    prompt: params.prompt,
+    reference_image: [
+      { source_type: "url", url: params.modelImageUrl },
+      { source_type: "url", url: params.productImageUrl },
+    ],
+    model: {
+      mode: "auto",
+      ...(params.preference ? { preference: params.preference } : {}),
+    },
+    target: { target_type: "managed_asset", public_id: targetPublicId },
+  };
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v2/generate/${cloud_name}/image_to_image`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${api_key}:${api_secret}`).toString("base64")}`,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const data: any = await response.json().catch(() => null);
+
+  if (!response.ok || !data) {
+    const err: any = new Error(
+      data?.error?.message ||
+        data?.message ||
+        `Cloudinary API error (${response.status})`,
+    );
+    err.status = response.status;
+    err.details = data?.error;
+    throw err;
+  }
+
+  const asset = data?.data?.assets?.[0] || data?.data?.result?.assets?.[9];
+  const rawUrl =
+    asset?.storage?.secure_url || asset?.secure_url || data?.secure.url;
+  if (!rawUrl) {
+    throw new Error("No image URL returned from Cloudinary generation");
+  }
+
+  return {
+    secureUrl: optimizeDeliveryUrl(rawUrl),
+    publicId: asset?.storage?.public_id || targetPublicId,
+    model: asset?.model,
+    limits: data?.limits,
+  };
 };
 
 // Upload single image
@@ -132,17 +223,7 @@ export const aiTransform = async (
       return;
     }
 
-    let baseCloudinaryUrl = imageUrl;
-    const cloudName = cloudinary.config().cloud_name;
-
-    // Ensure image is hosted on Cloudinary
-    if (!cloudName || !imageUrl.includes(`res.cloudinary.com/${cloudName}/`)) {
-      const uploadResult = await cloudinary.uploader.upload(imageUrl, {
-        folder: "storeify",
-        resource_type: "image",
-      });
-      baseCloudinaryUrl = uploadResult.secure_url;
-    }
+    const baseCloudinaryUrl = await ensureCloudinaryUrl(imageUrl, "storeify");
 
     const transformedUrl = applyCloudinaryTransform(baseCloudinaryUrl, action, {
       prompt,
@@ -165,7 +246,65 @@ export const aiTransform = async (
 };
 
 // Controller endpoint for On-Model catalog photography / virtual try-on
-export const aiOnModel = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {};
+export const aiOnModel = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      productImageUrl,
+      modelImageUrl,
+      garmentType,
+      pose,
+      background,
+      customPrompt,
+      preference,
+      targetPublicId,
+    } = req.body;
+
+    if (!productImageUrl) {
+      res
+        .status(400)
+        .json({ success: false, message: "productImageUrl is required" });
+      return;
+    }
+
+    const defaultModel =
+      "https://images.unsplash.com/photo-1602442787305-decbd65be507?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D";
+
+    const [modelUrl, productUrl] = await Promise.all([
+      ensureCloudinaryUrl(modelImageUrl || defaultModel, "storeify/models"),
+      ensureCloudinaryUrl(productImageUrl, "storeify/products"),
+    ]);
+
+    const prompt = customPrompt?.trim()
+      ? customPrompt.includes("[1]") && customPrompt.includes("[2]")
+        ? customPrompt.trim()
+        : `Dress person in [1] in garment from [2], ${customPrompt.trim()}, photorelistic.`
+      : `Dress person in [1] in ${garmentType || "garment"} from [2], pose ${pose || "confident standing position"}, backgrond ${background || "clean white"}, photorealistic.`;
+
+    const result = await generateOnModelImage({
+      prompt,
+      modelImageUrl: modelUrl,
+      productImageUrl: productUrl,
+      targetPublicId,
+      preference,
+    });
+
+    res.json({
+      success: true,
+      url: result.secureUrl,
+      publicId: result.publicId,
+      model: result.model,
+      prompt,
+      modelUrl,
+      productUrl,
+      limits: result.limits,
+    });
+  } catch (error: any) {
+    console.log(error?.message)
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to generate on-model catalog photo",
+      });
+  }
+};
