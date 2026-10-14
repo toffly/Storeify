@@ -9,6 +9,23 @@ export const optimizeDeliveryUrl = (url: string): string => {
   );
 };
 
+export const applyCloudinaryTransform = (
+  url: string,
+  action: "recolor" | "bg-removal",
+  options: {
+    prompt?: string;
+    toColor?: string;
+    multiple?: boolean;
+  } = {},
+): string => {
+  const transform =
+    action === "bg-removal"
+      ? "e_background_removal,f_auto,q_auto"
+      : `e_gen_recolor:prompt_${encodeURIComponent(options.prompt || "object")};to-color_${(options.toColor || "red").replace("#", "")}${options.multiple ? ";multiple_true" : ""},f_auto,q_auto`;
+
+  return url.replace("/image/upload/", `/image/upload/${transform}/`);
+};
+
 export const uploadToCloudinary = async (
   fileBuffer: Buffer,
   folder: string = "storeify",
@@ -61,7 +78,7 @@ export const uploadSingle = async (
 
     res.json({ success: true, url });
   } catch (error: any) {
-    console.log(error?.message)
+    console.log(error?.message);
     res.status(500).json({ success: false, message: "Image upload failed" });
   }
 };
@@ -95,7 +112,7 @@ export const uploadMultiple = async (
 
     res.json({ success: true, urls });
   } catch (error: any) {
-    console.log(error?.message)
+    console.log(error?.message);
     res.status(500).json({ success: false, message: "Image upload failed" });
   }
 };
@@ -104,7 +121,48 @@ export const uploadMultiple = async (
 export const aiTransform = async (
   req: Request,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const { imageUrl, action, prompt, toColor, multiple } = req.body;
+
+    if (!imageUrl) {
+      res
+        .status(500)
+        .json({ success: false, message: "Valid imageUrl is required" });
+      return;
+    }
+
+    let baseCloudinaryUrl = imageUrl;
+    const cloudName = cloudinary.config().cloud_name;
+
+    // Ensure image is hosted on Cloudinary
+    if (!cloudName || !imageUrl.includes(`res.cloudinary.com/${cloudName}/`)) {
+      const uploadResult = await cloudinary.uploader.upload(imageUrl, {
+        folder: "storeify",
+        resource_type: "image",
+      });
+      baseCloudinaryUrl = uploadResult.secure_url;
+    }
+
+    const transformedUrl = applyCloudinaryTransform(baseCloudinaryUrl, action, {
+      prompt,
+      toColor,
+      multiple: Boolean(multiple),
+    });
+
+    res.json({
+      success: true,
+      url: transformedUrl,
+      originalUrl: imageUrl,
+      action,
+    });
+  } catch (error: any) {
+    console.log(error?.message);
+    res
+      .status(500)
+      .json({ success: false, message: "AI transformation failed" });
+  }
+};
 
 // Controller endpoint for On-Model catalog photography / virtual try-on
 export const aiOnModel = async (
