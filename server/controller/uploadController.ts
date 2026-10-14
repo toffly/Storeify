@@ -164,10 +164,7 @@ export const uploadSingle = async (
     const url = await uploadToCloudinary(req.file.buffer, "storeify", {
       mimetype: req.file.mimetype,
       filename: req.file.originalname,
-    }).catch(
-      () =>
-        `data: ${req.file!.mimetype};base64,${req.file!.buffer.toString("base64")}`,
-    );
+    })
 
     res.json({ success: true, url });
   } catch (error: any) {
