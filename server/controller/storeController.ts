@@ -194,7 +194,77 @@ export const onboardMerchant = async (
 export const updateMyStore = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    if (req.user?.role === "admin") {
+      res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: Platform admin accounts cannot create stores or become merchants",
+      });
+      return;
+    }
+
+    const merchantId = req.user?.id;
+    const store = await prisma.stores.findFirst({
+      where: { merchant_id: merchantId },
+    });
+
+    if (!store) {
+      res.status(404).json({ success: false, message: "Store not found" });
+      return;
+    }
+
+    const {
+      name,
+      description,
+      logo_url,
+      banner_url,
+      currency,
+      shipping_fee,
+      free_shipping_threshold,
+      hero_style,
+      accent_color,
+    } = req.body;
+
+    const VALID_HERO = ["hero1", "hero2", "hero3", "hero4"];
+
+    const updated = await prisma.stores.update({
+      where: {
+        id: store.id,
+      },
+      data: {
+        ...Object.fromEntries(
+          Object.entries({
+            name,
+            description,
+            logo_url,
+            banner_url,
+            currency,
+          }).filter(([, v]) => v !== undefined),
+        ),
+        ...(shipping_fee !== undefined && {
+          shipping_fee: Number(shipping_fee),
+        }),
+        ...(free_shipping_threshold !== undefined && {
+          free_shipping_threshold: Number(free_shipping_threshold),
+        }),
+        ...(hero_style && VALID_HERO.includes(hero_style) && { hero_style }),
+        ...(accent_color && {
+          accent_color: String(accent_color).trim() || "#059669",
+        }),
+      },
+    });
+    res.json({
+      success: true,
+      message: "Store updated successfully",
+      store: updated,
+    });
+  } catch (error: any) {
+    console.error("updateMyStore error:", error);
+    res.status(500).json({ success: false, message: "Failed to update store" });
+  }
+};
 
 // Platform Admin: Get all stores with stats
 export const getAllStore = async (
