@@ -41,6 +41,19 @@ export const createProduct = async (
       return;
     }
 
+    if (category_id) {
+      const category = await prisma.categories.findFirst({
+        where: { id: Number(category_id), store_id: store.id },
+      });
+      if (!category) {
+        res.status(400).json({
+          success: false,
+          message: "Category not found or access denied",
+        });
+        return;
+      }
+    }
+
     const product = await prisma.products.create({
       data: {
         store_id: store.id,
@@ -110,6 +123,19 @@ export const updateProduct = async (
       varients,
       status = "active",
     } = req.body;
+
+    if (category_id) {
+      const category = await prisma.categories.findFirst({
+        where: { id: Number(category_id), store_id: store.id },
+      });
+      if (!category) {
+        res.status(400).json({
+          success: false,
+          message: "Category not found or access denied",
+        });
+        return;
+      }
+    }
 
     if (!name || price === undefined) {
       res.status(400).json({
