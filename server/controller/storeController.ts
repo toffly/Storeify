@@ -315,7 +315,7 @@ export const getAllStore = async (
 
 // Platform Admin: Get all merchants
 export const getAllMerchants = async (
-  req: AuthenticatedRequest,
+  _req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
   try {
@@ -350,7 +350,6 @@ export const getAllMerchants = async (
     });
 
     res.json({ success: true, merchants });
-    
   } catch (error: any) {
     console.error("getAllMerchants error:", error);
     res
@@ -363,4 +362,33 @@ export const getAllMerchants = async (
 export const toggleStoreStatus = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const { storeId } = req.params;
+    const store = await prisma.stores.findUnique({
+      where: { id: Number(storeId) },
+    });
+
+    if (!store) {
+      res.status(404).json({ success: false, message: "Store not found" });
+      return;
+    }
+
+    const newStatus = store.status === "active" ? "suspended" : "active"
+    const updated = await prisma.stores.update({
+      where: {id: Number(storeId)},
+      data: {status: newStatus}
+    })
+
+    res.json({
+      success: true,
+      message: `Store has been ${newStatus === "active" ? "activated": "suspended"}`,
+      store: updated
+    })
+  } catch (error: any) {
+    console.error("toggleStoreStatus error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to toggle status" });
+  }
+};
