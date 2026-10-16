@@ -3,7 +3,10 @@ import { AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../config/prisma.js";
 
 export const getMerchantStore = (merchantId: string) => {
-  return prisma.stores.findFirst({ where: { merchant_id: merchantId } });
+  return prisma.stores.findFirst({
+    where: { merchant_id: merchantId },
+    orderBy: [{ created_at: "desc" }, { id: "desc" }],
+  });
 };
 
 // Create new Product
@@ -62,7 +65,7 @@ export const createProduct = async (
         description: description,
         price: Number(price),
         compare_at_price: compare_at_price ? Number(compare_at_price) : null,
-        sku: sku?.trim() || 0,
+        sku: sku?.trim() || null,
         stock: Number(stock) || 0,
         images: Array.isArray(images) ? images : [],
         variants: Array.isArray(variants) ? variants : [],
@@ -117,12 +120,20 @@ export const updateProduct = async (
       price,
       compare_at_price,
       sku,
-      stock = 0,
+      stock,
       category_id,
       images,
       variants,
-      status = "active",
+      status,
     } = req.body;
+
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      res.status(400).json({
+        success: false,
+        message: "Product name cannot be blank",
+      });
+      return;
+    }
 
     if (category_id) {
       const category = await prisma.categories.findFirst({
@@ -135,14 +146,6 @@ export const updateProduct = async (
         });
         return;
       }
-    }
-
-    if (!name || price === undefined) {
-      res.status(400).json({
-        success: false,
-        message: "Product name and price are required",
-      });
-      return;
     }
 
     const updated = await prisma.products.update({
@@ -164,8 +167,8 @@ export const updateProduct = async (
             category_id !== undefined
               ? category_id
                 ? Number(category_id)
-                : []
-              : null,
+                : null
+              : undefined,
           images:
             images !== undefined
               ? Array.isArray(images)
