@@ -174,4 +174,33 @@ export const updateProduct = async (
 export const deleteProduct = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const store = await getMerchantStore(req.user!.id);
+    if (!store) {
+      res.status(404).json({
+        success: false,
+        message: "Store not found",
+      });
+      return;
+    }
+    const deleted = await prisma.products.deleteMany({
+      where: { id: Number(req.params.id), store_id: store.id },
+    });
+
+    if (deleted.count === 0) {
+      res.status(404).json({
+        success: false,
+        message: "Product not found or access denied",
+      });
+      return;
+    }
+
+    res.json({ success: true, message: "Product deleted successfully" });
+  } catch (error: any) {
+    console.error("deleteProduct error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete product" });
+  }
+};
