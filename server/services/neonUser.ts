@@ -39,3 +39,55 @@ export const findNeonUser = async (filter: {
   }
   return null;
 };
+
+export const updateNeonUserRole = async (
+  userId: string,
+  role: string,
+): Promise<void> => {
+  try {
+    await prisma.$executeRaw`
+    UPDATE neon_auth.user 
+    SET role = ${role}, "updatedAt" = NOW() 
+    WHERE id = ${userId}::uuid AND (role IS NULL OR role != 'admin')`;
+  } catch (error) {
+    console.error(error);
+    throw error
+  }
+};
+
+export const findNeonUserByIds = async (
+  ids: string[],
+): Promise<Record<string, NeonUserRecord>> => {
+  if (!ids || ids.length === 0) return {};
+  try {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    const rows = await prisma.$queryRaw<NeonUserRecord[]>`
+    SELECT id, name, email, role, "createdAt" as "createdAt"
+    FROM neon_auth.user
+    WHERE id::text = ANY(${uniqueIds})
+    `;
+
+    const map: Record<string, NeonUserRecord> = {};
+    for (const row of rows) {
+      map[row.id] = row;
+    }
+    return map;
+  } catch (error) {
+    console.error(error);
+    return {};
+  }
+};
+
+export const findNeonMerchants = async (): Promise<NeonUserRecord[]> => {
+  try {
+    return await prisma.$queryRaw<NeonUserRecord[]>`
+    SELECT id, name, email, role, "createdAt" as "createdAt"
+    FROM neon_auth.user
+    WHERE role = 'merchant'
+    ORDER BY "createdAt" DESC
+    `;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
