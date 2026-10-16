@@ -29,7 +29,7 @@ export const createProduct = async (
       stock = 0,
       category_id,
       images = [],
-      varients = [],
+      variants = [],
       status = "active",
     } = req.body;
 
@@ -65,7 +65,7 @@ export const createProduct = async (
         sku: sku?.trim() || 0,
         stock: Number(stock) || 0,
         images: Array.isArray(images) ? images : [],
-        varients: Array.isArray(varients) ? varients : [],
+        variants: Array.isArray(variants) ? variants : [],
         status: status || "active",
       },
     });
@@ -120,7 +120,7 @@ export const updateProduct = async (
       stock = 0,
       category_id,
       images,
-      varients,
+      variants,
       status = "active",
     } = req.body;
 
@@ -172,10 +172,10 @@ export const updateProduct = async (
                 ? images
                 : []
               : undefined,
-          varients:
-            varients !== undefined
-              ? Array.isArray(varients)
-                ? varients
+          variants:
+            variants !== undefined
+              ? Array.isArray(variants)
+                ? variants
                 : []
               : undefined,
           status,
