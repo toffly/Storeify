@@ -1,12 +1,9 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../config/prisma.js";
-import { Prisma } from "../generated/prisma/client.js";
 
 const generateOrderNumber = () =>
   `ORD-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-class OrderAvailabilityError extends Error {}
 
 const findStore = async (where: { slug?: string; id?: number }) => {
   return prisma.stores.findUnique({ where: where as any });
@@ -34,19 +31,6 @@ export const createOrder = async (
         message: "Cart is empty",
       });
       return;
-    }
-
-    const cart: { item: (typeof items)[number]; quantity: number }[] = [];
-    for (const item of items) {
-      const quantity = Number(item.quantity);
-      if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-        res.status(400).json({
-          success: false,
-          message: "Item quantities must be positive integers",
-        });
-        return;
-      }
-      cart.push({ item, quantity });
     }
 
     if (!customerName || !customerEmail || !shippingAddress) {
@@ -79,130 +63,86 @@ export const createOrder = async (
       return;
     }
 
-    const customerId = req.user?.id || null;
+    let subtotal = 0;
+    const processedItems = [];
 
-    const order = await prisma.$transaction(async (tx) => {
-      const products = await Promise.all(
-        cart.map(({ item }) =>
-          tx.products.findFirst({
-            where: {
-              id: Number(item.productId),
-              store_id: targetStore.id,
-              status: "active",
-            },
-          }),
-        ),
-      );
-
-      const entries = cart.map(({ item, quantity }, index) => {
-        const product = products[index];
-        if (!product) {
-          throw new OrderAvailabilityError(
-            `product ${item.name || item.productId} no longer exists`,
-          );
-        }
-        return { item, quantity, product };
-      });
-
-      const stockRequirements = new Map<
-        number,
-        { product: (typeof entries)[number]["product"]; quantity: number }
-      >();
-      for (const { product, quantity } of entries) {
-        const requirement = stockRequirements.get(product.id);
-        stockRequirements.set(product.id, {
-          product,
-          quantity: (requirement?.quantity ?? 0) + quantity,
-        });
-      }
-
-      for (const { product, quantity } of stockRequirements.values()) {
-        if ((product.stock ?? 0) < quantity) {
-          throw new OrderAvailabilityError(
-            `Not enough stock for ${product.name}. Available: ${product.stock}`,
-          );
-        }
-      }
-
-      let subtotal = new Prisma.Decimal(0);
-      const orderItems = entries.map(({ item, quantity, product }) => {
-        const images = Array.isArray(product.images)
-          ? (product.images as string[])
-          : [];
-        subtotal = subtotal.plus(product.price.mul(quantity));
-        return {
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          quantity,
-          variant: item.variant || null,
-          image: images[0] || null,
-        };
-      });
-
-      for (const { product, quantity } of stockRequirements.values()) {
-        const updated = await tx.products.updateMany({
-          where: {
-            id: product.id,
-            store_id: targetStore.id,
-            status: "active",
-            stock: { gte: quantity },
-          },
-          data: { stock: { decrement: quantity } },
-        });
-        if (updated.count !== 1) {
-          throw new OrderAvailabilityError(
-            `Not enough stock for ${product.name}. Available: ${product.stock}`,
-          );
-        }
-      }
-
-      const shippingFee = targetStore.shipping_fee ?? new Prisma.Decimal(0);
-      const freeThreshold =
-        targetStore.free_shipping_threshold ?? new Prisma.Decimal(0);
-      const shippingCost =
-        freeThreshold.greaterThan(0) &&
-        subtotal.greaterThanOrEqualTo(freeThreshold)
-          ? new Prisma.Decimal(0)
-          : shippingFee;
-      const calculatedTotal = subtotal.plus(shippingCost);
-      const total = calculatedTotal.greaterThan(0)
-        ? calculatedTotal
-        : new Prisma.Decimal(0);
-
-      return tx.orders.create({
-        data: {
-          order_number: generateOrderNumber(),
+    for (const item of items) {
+      const product = await prisma.products.findFirst({
+        where: {
+          id: Number(item.productId),
           store_id: targetStore.id,
-          customer_id: customerId,
-          customer_name: customerName.trim(),
-          customer_email: customerEmail.trim().toLowerCase(),
-          customer_phone: customerPhone || null,
-          shipping_address: shippingAddress,
-          items: orderItems.map(({ price, ...item }) => ({
-            ...item,
-            price: price.toNumber(),
-          })),
-          subtotal,
-          discount: 0,
-          shipping_cost: shippingCost,
-          total,
-          coupon_code: null,
-          payment_status: "pending",
-          payment_method: "cod",
-          order_status: "placed",
+          status: "active",
         },
       });
+      if (!product) {
+        res.status(400).json({
+          success: false,
+          message: `product ${item.name || item.productId} no longer exists`,
+        });
+        return;
+      }
+
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      if ((product.stock ?? 0) < qty) {
+        res.status(400).json({
+          success: false,
+          message: `Not enough stock for ${product.name}. Available: ${product.stock}`,
+        });
+        return;
+      }
+
+      const itemPrice = Number(product.price);
+      subtotal += itemPrice * qty;
+      const images = Array.isArray(product.images)
+        ? (product.images as string[])
+        : [];
+      processedItems.push({
+        productId: product.id,
+        name: product.name,
+        price: itemPrice,
+        quantity: qty,
+        variant: item.variant || null,
+        image: images[0] || null,
+      });
+
+      await prisma.products.update({
+        where: { id: product.id },
+        data: { stock: { decrement: qty } },
+      });
+    }
+
+    const shippingFee = Number(targetStore.shipping_fee) || 0;
+    const freeThreshold = Number(targetStore.free_shipping_threshold) || 0;
+    const shippingCost =
+      freeThreshold > 0 && subtotal >= freeThreshold ? 0 : shippingFee;
+    const total = Math.max(0, subtotal + shippingCost);
+    const customerId = req.user?.id || null;
+
+    const order = await prisma.orders.create({
+      data: {
+        order_number: generateOrderNumber(),
+        store_id: targetStore.id,
+        customer_id: customerId,
+        customer_name: customerName.trim(),
+        customer_email: customerEmail.trim().toLowerCase(),
+        customer_phone: customerPhone || null,
+        shipping_address: shippingAddress,
+        items: processedItems,
+        subtotal,
+        discount: 0,
+        shipping_cost: shippingCost,
+        total,
+        coupon_code: null,
+        payment_status: "pending",
+        payment_method: "cod",
+        order_status: "placed",
+      },
     });
 
     res
       .status(201)
       .json({ success: true, message: "Order placed successfully", order });
   } catch (error: any) {
-    if (error instanceof OrderAvailabilityError) {
-      res.status(400).json({ success: false, message: error.message });
-      return;
-    }
     console.error("createOrder error:", error);
     res.status(500).json({ success: false, message: "Failed to create order" });
   }
