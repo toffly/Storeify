@@ -1,7 +1,12 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../config/prisma.js";
-import { findNeonUserByIds, updateNeonUserRole } from "../services/neonUser.js";
+import {
+  findNeonMerchants,
+  findNeonUserByIds,
+  updateNeonUserRole,
+} from "../services/neonUser.js";
+import { umask } from "node:process";
 
 // Helper to generate clean slug
 const generateSlug = (text: string): string => {
@@ -312,7 +317,47 @@ export const getAllStore = async (
 export const getAllMerchants = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const merchantList = await findNeonMerchants();
+
+    const stores = await prisma.stores.findMany({
+      where: { merchant_id: { in: merchantList.map((m) => m.id) } },
+      select: {
+        id: true,
+        merchant_id: true,
+        name: true,
+        slug: true,
+        status: true,
+      },
+    });
+
+    const storeMap = new Map<string, (typeof stores)[0]>();
+
+    for (const store of stores) {
+      if (store.merchant_id) storeMap.set(store.merchant_id, store);
+    }
+
+    const merchants = merchantList.map((u) => {
+      const store = storeMap.get(u.id) ?? null;
+      return {
+        ...u,
+        store_id: store?.id ?? null,
+        store_name: store?.name ?? null,
+        store_slug: store?.slug ?? null,
+        store_status: store?.status ?? null,
+      };
+    });
+
+    res.json({ success: true, merchants });
+    
+  } catch (error: any) {
+    console.error("getAllMerchants error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch merchants" });
+  }
+};
 
 // Platform Admin: Toggle store status ( active / suspended )
 export const toggleStoreStatus = async (
