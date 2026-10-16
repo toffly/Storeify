@@ -15,7 +15,10 @@ const generateSlug = (text: string): string => {
 };
 
 // Create a new store ( for authenticated merchant )
-export const createStore = async (req: AuthenticatedRequest, res: Response) => {
+export const createStore = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const merchantId = req.user?.id;
     if (!merchantId) {
@@ -120,7 +123,10 @@ export const createStore = async (req: AuthenticatedRequest, res: Response) => {
 };
 
 // Get authenticated merchant's store
-export const getMyStore = async (req: AuthenticatedRequest, res: Response) => {
+export const getMyStore = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
   try {
     if (req.user?.role === "admin") {
       res.status(403).json({
@@ -148,28 +154,62 @@ export const getMyStore = async (req: AuthenticatedRequest, res: Response) => {
 export const onboardMerchant = async (
   req: AuthenticatedRequest,
   res: Response,
-) => {};
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    // Platform admin account cannnot create a stores or become merchants
+    if (req.user?.role === "admin") {
+      res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: Platform admin accounts cannot create stores or become merchants",
+      });
+      return;
+    }
+
+    await updateNeonUserRole(userId, "merchant");
+    const store = await prisma.stores.findFirst({
+      where: { merchant_id: userId },
+    });
+
+    res.json({
+      success: true,
+      role: "merchant",
+      store: store || null,
+    });
+  } catch (error: any) {
+    console.error("Failed to onboard merchant:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to onboard merchant" });
+  }
+};
 
 // Update merchant's store settings
 export const updateMyStore = async (
   req: AuthenticatedRequest,
   res: Response,
-) => {};
+): Promise<void> => {};
 
 // Platform Admin: Get all stores with stats
 export const getAllStore = async (
   _req: AuthenticatedRequest,
   res: Response,
-) => {};
+): Promise<void> => {};
 
 // Platform Admin: Get all merchants
 export const getAllMerchants = async (
   req: AuthenticatedRequest,
   res: Response,
-) => {};
+): Promise<void> => {};
 
 // Platform Admin: Toggle store status ( active / suspended )
 export const toggleStoreStatus = async (
   req: AuthenticatedRequest,
   res: Response,
-) => {};
+): Promise<void> => {};
