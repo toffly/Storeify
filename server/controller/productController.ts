@@ -62,7 +62,7 @@ export const createProduct = async (
         description: description,
         price: Number(price),
         compare_at_price: compare_at_price ? Number(compare_at_price) : null,
-        sku: sku?.trim() || 0,
+        sku: sku?.trim() || null,
         stock: Number(stock) || 0,
         images: Array.isArray(images) ? images : [],
         variants: Array.isArray(variants) ? variants : [],
