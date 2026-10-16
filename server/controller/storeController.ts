@@ -120,10 +120,29 @@ export const createStore = async (req: AuthenticatedRequest, res: Response) => {
 };
 
 // Get authenticated merchant's store
-export const getMyStore = async (
-  req: AuthenticatedRequest,
-  res: Response,
-) => {};
+export const getMyStore = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role === "admin") {
+      res.status(403).json({
+        success: false,
+        message: "Forbidden: Platform admin do not manage merchant stores",
+      });
+      return;
+    }
+
+    const merchantId = req.user?.id;
+    const store = await prisma.stores.findFirst({
+      where: { merchant_id: merchantId },
+    });
+
+    res.json({ success: true, store: store || null });
+  } catch (error: any) {
+    console.error("getMyStore error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "getMyStore error:" + error });
+  }
+};
 
 // onboard or elevate user to merchant role
 export const onboardMerchant = async (
