@@ -151,7 +151,7 @@ export const getMyStore = async (
     console.error("getMyStore error:", error);
     res
       .status(500)
-      .json({ success: false, message: "getMyStore error:" + error });
+      .json({ success: false, message: "Failed to fetch store" });
   }
 };
 

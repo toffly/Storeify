@@ -81,7 +81,7 @@ export const findNeonUserByIds = async (
 export const findNeonMerchants = async (): Promise<NeonUserRecord[]> => {
   try {
     return await prisma.$queryRaw<NeonUserRecord[]>`
-    SELECT id, name, email, role "createdAt" as "createdAt"
+    SELECT id, name, email, role, "createdAt" as "createdAt"
     FROM neon_auth.user
     WHERE role = 'merchant'
     ORDER BY "createdAt" DESC

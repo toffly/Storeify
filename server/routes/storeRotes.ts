@@ -26,8 +26,8 @@ storeRouter.get(
   requireRole(["admin"]),
   getAllMerchants,
 );
-storeRouter.get(
-  "/admin/:storeId/stats",
+storeRouter.patch(
+  "/admin/:storeId/status",
   requireAuth,
   requireRole(["admin"]),
   toggleStoreStatus,
