@@ -39,3 +39,17 @@ export const findNeonUser = async (filter: {
   }
   return null;
 };
+
+export const updateNeonUserRole = async (
+  userId: string,
+  role: string,
+): Promise<void> => {
+  try {
+    await prisma.$executeRaw`
+    UPDATE neon_auth.user 
+    SET role = ${role}, "updatedAt" = NOW() 
+    WHERE id = ${userId}::uuid AND (role IS NULL OR role != "admin")`;
+  } catch (error) {
+    console.error(error);
+  }
+};
