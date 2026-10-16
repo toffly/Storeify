@@ -53,3 +53,26 @@ export const updateNeonUserRole = async (
     console.error(error);
   }
 };
+
+export const findNeonUserByIds = async (
+  ids: string[],
+): Promise<Record<string, NeonUserRecord>> => {
+  if (!ids || ids.length === 0) return {};
+  try {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    const rows = await prisma.$queryRaw<NeonUserRecord[]>`
+    SELECT id, name, email, role, "createdAt" as "createdAt"
+    FROM neon_auth.user
+    WHERE id::text = ANY(${uniqueIds})
+    `;
+
+    const map: Record<string, NeonUserRecord> = {};
+    for (const row of rows) {
+      map[row.id] = row;
+    }
+    return map;
+  } catch (error) {
+    console.error(error);
+    return {};
+  }
+};
