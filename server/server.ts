@@ -4,6 +4,8 @@ import cors from "cors";
 import categoryRouter from "./routes/categoryRoutes.js";
 import uploadRouter from "./routes/uploadRoutes.js";
 import storeRouter from "./routes/storeRotes.js";
+import productRouter from "./routes/productRoutes.js";
+import orderRouter from "./routes/orderRoutes.js";
 
 const app = express();
 
@@ -22,6 +24,8 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/categories", categoryRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/stores", storeRouter);
+app.use("/api/products", productRouter);
+app.use("/api/orders", orderRouter);
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
