@@ -233,4 +233,43 @@ export const updateorderStatus = async (
 export const getOrderReceipt = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const ident = String(req.params.orderIdentifier);
+    const parsedId = !isNaN(Number(ident)) ? Number(ident) : -1;
+    const raw = await prisma.orders.findFirst({
+      where: { OR: [{ order_number: ident }, { id: parsedId }] },
+      include: {
+        stores: {
+          select: {
+            name: true,
+            slug: true,
+            currency: true,
+            logo_url: true,
+            accent_color: true,
+          },
+        },
+      },
+    });
+
+    if(!raw){
+      res.status(404).json({success: false, message: "Order not found"})
+      return
+    }
+
+    const {stores, ...rest} = raw
+    res.json({success: true, order: {
+      ...rest,
+      store_name: stores?.name || null,
+      store_slug: stores?.slug || null,
+      store_currency: stores?.currency || "USD",
+      store_logo: stores?.logo_url || null,
+      store_accent_color: stores?.accent_color || "#059669",
+    }})
+  } catch (error: any) {
+    console.error("getOrderReceipt error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch order receipt" });
+  }
+};
