@@ -299,7 +299,7 @@ export const getCustomerOrders = async (
               {
                 customer_email: {
                   equals: userEmail,
-                  node: "insensitive" as const,
+                  mode: "insensitive" as const,
                 },
               },
             ]
@@ -308,7 +308,7 @@ export const getCustomerOrders = async (
     };
 
     if (targetStore) {
-      whereClause.storeId = targetStore.id;
+      whereClause.store_id = targetStore.id;
     }
 
     const rawOrders = await prisma.orders.findMany({
