@@ -252,24 +252,85 @@ export const getOrderReceipt = async (
       },
     });
 
-    if(!raw){
-      res.status(404).json({success: false, message: "Order not found"})
-      return
+    if (!raw) {
+      res.status(404).json({ success: false, message: "Order not found" });
+      return;
     }
 
-    const {stores, ...rest} = raw
-    res.json({success: true, order: {
-      ...rest,
-      store_name: stores?.name || null,
-      store_slug: stores?.slug || null,
-      store_currency: stores?.currency || "USD",
-      store_logo: stores?.logo_url || null,
-      store_accent_color: stores?.accent_color || "#059669",
-    }})
+    const { stores, ...rest } = raw;
+    res.json({
+      success: true,
+      order: {
+        ...rest,
+        store_name: stores?.name || null,
+        store_slug: stores?.slug || null,
+        store_currency: stores?.currency || "USD",
+        store_logo: stores?.logo_url || null,
+        store_accent_color: stores?.accent_color || "#059669",
+      },
+    });
   } catch (error: any) {
     console.error("getOrderReceipt error:", error);
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch order receipt" });
+  }
+};
+
+// Get customer orders
+export const getCustomerOrders = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id: userId, email: userEmail } = req.user!;
+    const { storeSlug, storeId } = req.query!;
+    const targetStore = storeSlug
+      ? await findStore({ slug: String(storeSlug) })
+      : storeId
+        ? await findStore({ id: Number(storeId) })
+        : null;
+
+    const whereClause: any = {
+      OR: [
+        { customer_id: userId },
+        ...(userEmail
+          ? [
+              {
+                customer_email: {
+                  equals: userEmail,
+                  node: "insensitive" as const,
+                },
+              },
+            ]
+          : []),
+      ],
+    };
+
+    if (targetStore) {
+      whereClause.storeId = targetStore.id;
+    }
+
+    const rawOrders = await prisma.orders.findMany({
+      where: whereClause,
+      include: {
+        stores: { select: { name: true, slug: true, currency: true } },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    const orders = rawOrders.map(({ stores, ...rest }) => ({
+      ...rest,
+      store_name: stores?.name || null,
+      store_slug: stores?.slug || null,
+      store_currency: stores?.currency || "USD",
+    }));
+
+    res.json({ success: true, orders });
+  } catch (error: any) {
+    console.error("getCustomerOrders error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch customer orders" });
   }
 };
