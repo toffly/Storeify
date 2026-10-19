@@ -152,7 +152,29 @@ export const createOrder = async (
 export const getMerchantOrders = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const store = await prisma.stores.findFirst({
+      where: {merchant_id: req.user?.id}
+    })
+
+    if(!store){
+      res.status(404).json({success: false, message: "Store not found"})
+      return
+    }
+
+    const {status} = req.query
+    const orders = await prisma.orders.findMany({
+      where: {store_id: store.id, ...(status ? {order_status: status as string}: {})},
+      orderBy: {created_at: "desc"}
+    })
+
+    res.json({success: true, orders})
+  } catch (error: any) {
+    console.error("getMerchantOrders error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch order" });
+  }
+};
 
 // Update order status
 export const updateorderStatus = async (
