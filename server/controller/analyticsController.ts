@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../config/prisma.js";
+import { countNeonMerchant, findNeonUserByIds } from "../services/neonUser.js";
 
 const getMerchantStore = (merchantId: string) => {
   return prisma.stores.findFirst({ where: { merchant_id: merchantId } });
@@ -86,4 +87,72 @@ export const getMerchantAnalytics = async (
 export const getPlatformAnalytics = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const [
+      totalStores,
+      activeStores,
+      suspendedStores,
+      totalMerchants,
+      totalOrders,
+      paidAgg,
+      storeWithStats,
+    ] = await Promise.all([
+      prisma.stores.count(),
+      prisma.stores.count({ where: { status: "active" } }),
+      prisma.stores.count({ where: { status: "suspended" } }),
+      countNeonMerchant(),
+      prisma.orders.count(),
+      prisma.orders.aggregate({
+        where: { payment_status: "paid" },
+        _sum: { total: true },
+      }),
+      prisma.stores.findMany({
+        include: {
+          orders: {
+            where: { payment_status: "paid" },
+            select: { total: true },
+          },
+          _count: { select: { orders: true } },
+        },
+      }),
+    ]);
+
+    const merchantIds = storeWithStats
+      .map((s) => s.merchant_id)
+      .filter(Boolean) as string[];
+    const userMap = await findNeonUserByIds(merchantIds);
+
+    const topStores = storeWithStats
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        slug: s.slug,
+        status: s.status,
+        merchant_name:
+          (s.merchant_id && userMap[s.merchant_id]?.name) || "Unknown",
+        order_count: s._count.orders,
+        revenue: s.orders.reduce((sum, o) => sum + Number(o.total), 0),
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    res.json({
+      success: true,
+      analytics: {
+        totalStores,
+        activeStores,
+        suspendedStores,
+        totalMerchants,
+        totalOrders,
+        totalRevenue: Number(paidAgg._sum.total) || 0,
+        topStores,
+      },
+    });
+  } catch (error: any) {
+    console.error("getPlatformAnalytics error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch platform analytics" });
+  }
+};
