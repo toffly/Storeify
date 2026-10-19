@@ -13,6 +13,6 @@ orderRouter.get("/customer/my-orders", optionalAuth, getCustomerOrders)
 
 // Merchant orders
 orderRouter.get("/merchant", requireAuth, requireRole(["merchant"]), getMerchantOrders)
-orderRouter.get("/merchant/id/:status", requireAuth, requireRole(["merchant"]), updateorderStatus)
+orderRouter.patch("/merchant/id/:status", requireAuth, requireRole(["merchant"]), updateorderStatus)
 
 export default orderRouter
