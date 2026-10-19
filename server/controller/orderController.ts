@@ -155,21 +155,24 @@ export const getMerchantOrders = async (
 ): Promise<void> => {
   try {
     const store = await prisma.stores.findFirst({
-      where: {merchant_id: req.user?.id}
-    })
+      where: { merchant_id: req.user?.id },
+    });
 
-    if(!store){
-      res.status(404).json({success: false, message: "Store not found"})
-      return
+    if (!store) {
+      res.status(404).json({ success: false, message: "Store not found" });
+      return;
     }
 
-    const {status} = req.query
+    const { status } = req.query;
     const orders = await prisma.orders.findMany({
-      where: {store_id: store.id, ...(status ? {order_status: status as string}: {})},
-      orderBy: {created_at: "desc"}
-    })
+      where: {
+        store_id: store.id,
+        ...(status ? { order_status: status as string } : {}),
+      },
+      orderBy: { created_at: "desc" },
+    });
 
-    res.json({success: true, orders})
+    res.json({ success: true, orders });
   } catch (error: any) {
     console.error("getMerchantOrders error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch order" });
@@ -180,7 +183,51 @@ export const getMerchantOrders = async (
 export const updateorderStatus = async (
   req: AuthenticatedRequest,
   res: Response,
-): Promise<void> => {};
+): Promise<void> => {
+  try {
+    const store = await prisma.stores.findFirst({
+      where: { merchant_id: req.user?.id },
+    });
+
+    if (!store) {
+      res.status(404).json({ success: false, message: "Store not found" });
+      return;
+    }
+
+    const { id } = req.params;
+    const { order_status, tracking_number, payment_status } = req.body;
+
+    const existing = await prisma.orders.findFirst({
+      where: { id: Number(id), store_id: store.id },
+    });
+
+    if (!existing) {
+      res.status(404).json({ success: false, message: "Order not found" });
+      return;
+    }
+
+    const updated = await prisma.orders.update({
+      where: { id: Number(id) },
+      data: {
+        order_status: order_status || existing.order_status,
+        tracking_number:
+          tracking_number !== undefined
+            ? tracking_number
+            : existing.tracking_number,
+        payment_status: payment_status || existing.payment_status,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Order updated successfully",
+      order: updated,
+    });
+  } catch (error: any) {
+    console.error("updateorderStatus error:", error);
+    res.status(500).json({ success: false, message: "Failed to update order" });
+  }
+};
 
 // Get order receipt
 export const getOrderReceipt = async (
