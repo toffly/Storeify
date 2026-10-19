@@ -9,7 +9,7 @@ orderRouter.post("/checkout", optionalAuth, createOrder)
 orderRouter.get("/receipt/:orderIdentifier", getOrderReceipt)
 
 // Customer order history
-orderRouter.get("/customer/my-orders", optionalAuth, getCustomerOrders)
+orderRouter.get("/customer/my-orders", requireAuth, getCustomerOrders)
 
 // Merchant orders
 orderRouter.get("/merchant", requireAuth, requireRole(["merchant"]), getMerchantOrders)
