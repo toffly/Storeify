@@ -76,7 +76,7 @@ export default {
         const [store] = await sql`
             SELECT id, merchant_id, name, slug, logo_url, banner_url, description, currency, status, shipping_fee, free_shipping_threshold, hero_style, accent_color, created_at
             FROM stores
-            WHERE slug = {slug}
+            WHERE slug = ${slug}
             LIMIT 1
             `;
 
