@@ -155,7 +155,7 @@ export default {
         return json({success: true, products})
       }
 
-      return json({success: false, message: "Route not found in Neon Public API"})
+      return json({success: false, message: "Route not found in Neon Public API"}, 404)
     } catch (error:any) {
         console.error("Neon Public AIP error:", error)
         return json({success: false, message: "Internal error"}, 500)
