@@ -82,7 +82,7 @@ export default {
 
         if (!store)
           return json({ success: false, message: "Store not found" }, 404);
-        if (store.status === "suspended") {
+        if (store.status === "suspended" || store.status === null) {
           return json(
             {
               success: false,
