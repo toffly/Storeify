@@ -111,13 +111,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setStore(initialRole === "admin" ? null : resolvedStore);
     } catch (err) {
-        console.error("Error refreshint auth session:",err)
-        localStorage.removeItem("storeify_token")
-        setUser(null)
-        setStore(null)
-        setToken(null)
+      console.error("Error refreshint auth session:", err);
+      localStorage.removeItem("storeify_token");
+      setUser(null);
+      setStore(null);
+      setToken(null);
     } finally {
-        setLoading(false)
+      setLoading(false);
     }
   };
 
@@ -126,24 +126,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = (newToken: string, newUser: User, newStore?: Store | null) => {
-    localStorage.setItem("storeify_token", newToken);
-    localStorage.setItem("storeify_user", JSON.stringify(newUser));
-    if (newStore !== undefined && newStore !== null) {
-      localStorage.setItem("storeify_store", JSON.stringify(newStore));
-    } else {
-      localStorage.removeItem("storeify_store");
+    if (newToken) {
+      localStorage.setItem("storeify_token", newToken);
+      setToken(newToken);
     }
-    setToken(newToken);
+
     setUser(newUser);
     if (newStore !== undefined) {
       setStore(newStore);
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+        await authClient.signOut()
+    } catch (err) {
+        console.warn("SignOut error:",err)
+    }
     localStorage.removeItem("storeify_token");
-    localStorage.removeItem("storeify_user");
-    localStorage.removeItem("storeify_store");
     setToken(null);
     setUser(null);
     setStore(null);
